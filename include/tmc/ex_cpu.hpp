@@ -413,7 +413,7 @@ template <> struct executor_traits<tmc::ex_cpu> {
   dispatch(tmc::ex_cpu& ex, std::coroutine_handle<> Outer, size_t Priority);
 };
 
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 TMC_DECL extern ex_cpu g_ex_cpu;
 #ifdef TMC_IMPL
 TMC_DECL ex_cpu g_ex_cpu;

@@ -59,8 +59,11 @@
     "standalone-compilation": {
       "description": "Enable TMC_STANDALONE_COMPILATION."
     },
+    "shared-library": {
+      "description": "Keep process-wide globals and TLS in the TMC implementation shared library."
+    },
     "windows-dll": {
-      "description": "Enable TMC_WINDOWS_DLL and TMC_STANDALONE_COMPILATION.",
+      "description": "Deprecated alias for shared-library on Windows.",
       "supports": "windows"
     }
   }

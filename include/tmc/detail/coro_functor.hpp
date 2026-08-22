@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "tmc/detail/allocation.hpp"
+
 #include <cassert>
 #include <coroutine>
 #include <cstdint>
@@ -91,7 +93,23 @@ private:
   template <typename T> static void cast_call_delete(void* TypeErasedObject) {
     T* typedObj = static_cast<T*>(TypeErasedObject);
     typedObj->operator()();
-    delete typedObj;
+    typedObj->~T();
+    if constexpr (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
+      tmc::detail::deallocate_aligned(typedObj, sizeof(T), alignof(T));
+    } else {
+      tmc::detail::deallocate(typedObj, sizeof(T));
+    }
+  }
+
+  template <typename T, typename... Args>
+  static T* allocate_functor(Args&&... args) {
+    void* storage;
+    if constexpr (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
+      storage = tmc::detail::allocate_aligned(sizeof(T), alignof(T));
+    } else {
+      storage = tmc::detail::allocate(sizeof(T));
+    }
+    return ::new (storage) T(static_cast<Args&&>(args)...);
   }
 
 public:
@@ -127,7 +145,7 @@ public:
   {
     func =
       reinterpret_cast<void*>(&cast_call_delete<std::remove_reference_t<T>>);
-    obj = reinterpret_cast<void*>(new T(Functor));
+    obj = reinterpret_cast<void*>(allocate_functor<T>(Functor));
   }
 
   /// Rvalue function object constructor. Moves the parameter into a
@@ -144,7 +162,9 @@ public:
   {
     func =
       reinterpret_cast<void*>(&cast_call_delete<std::remove_reference_t<T>>);
-    obj = reinterpret_cast<void*>(new T(static_cast<T&&>(Functor)));
+    obj = reinterpret_cast<void*>(
+      allocate_functor<T>(static_cast<T&&>(Functor))
+    );
   }
 
   /// Default constructor is provided for use with data structures that

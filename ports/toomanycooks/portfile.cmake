@@ -19,6 +19,7 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
         debug-task-alloc-count   TMC_DEBUG_TASK_ALLOC_COUNT
         debug-thread-creation    TMC_DEBUG_THREAD_CREATION
         standalone-compilation   TMC_STANDALONE_COMPILATION
+        shared-library           TMC_SHARED_LIBRARY
         windows-dll              TMC_WINDOWS_DLL
 )
 
@@ -28,10 +29,6 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS FEATURE_OPTIONS
 set(TMC_WORK_ITEM CORO)
 if("funcoro" IN_LIST FEATURES)
     set(TMC_WORK_ITEM FUNCORO)
-endif()
-
-if("windows-dll" IN_LIST FEATURES)
-    list(APPEND FEATURE_OPTIONS -DTMC_STANDALONE_COMPILATION=ON)
 endif()
 
 vcpkg_cmake_configure(

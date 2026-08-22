@@ -325,7 +325,7 @@ template <> struct executor_traits<tmc::ex_asio> {
   }
 };
 
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 TMC_DECL extern ex_asio g_ex_asio;
 #ifdef TMC_IMPL
 TMC_DECL ex_asio g_ex_asio;

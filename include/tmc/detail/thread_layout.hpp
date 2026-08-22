@@ -98,7 +98,7 @@ struct topo_data {
 // to populate it lazily. It should always be constructed at executor
 // init() or sooner, so if the executor needs to query it afterward in a
 // read-only fashion, a mutex is not needed.
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 TMC_DECL extern topo_data g_topo;
 #ifdef TMC_IMPL
 TMC_DECL topo_data g_topo;

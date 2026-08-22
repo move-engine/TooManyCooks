@@ -20,7 +20,7 @@ namespace detail {
 // The default executor that is used by post_checked / post_bulk_checked
 // when the current (non-TMC) thread's executor == nullptr.
 // Its value can be populated by calling tmc::set_default_executor().
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 TMC_DECL extern std::atomic<tmc::ex_any*> g_ex_default;
 #ifdef TMC_IMPL
 TMC_DECL constinit std::atomic<tmc::ex_any*> g_ex_default = nullptr;
@@ -37,7 +37,7 @@ struct running_task_data {
   std::atomic<size_t>* yield_priority;
 };
 
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 
 TMC_DECL extern std::atomic<size_t> never_yield;
 #ifdef TMC_IMPL
@@ -50,7 +50,7 @@ inline constinit std::atomic<size_t> never_yield = TMC_ALL_ONES;
 
 namespace this_thread {
 
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 
 struct tls_state {
   tmc::ex_any* executor;
@@ -63,13 +63,13 @@ TMC_DECL tls_state& tls() noexcept;
 
 #ifdef TMC_IMPL
 TMC_DECL
-#ifndef __clang__
+#if defined(_MSC_VER) && !defined(__clang__)
 // MSVC in Release build appears to incorrectly inline this function even when
 // it's dllimported, which results in different copies of the TLS data between
-// the DLL and consuming code. Clang doesn't have this problem.
+// the shared library and consuming code. Clang doesn't have this problem.
 // TODO this may not be the real culprit - latest MSVC-built executables crash
 // during tests even on the older version of the code, and this fails tests even
-// without TMC_WINDOWS_DLL enabled
+// without TMC_SHARED_LIBRARY enabled
 __declspec(noinline)
 #endif
 tls_state&
@@ -86,7 +86,7 @@ inline size_t& thread_index() noexcept { return tls().thread_index; }
 inline running_task_data& this_task() noexcept { return tls().this_task; }
 inline void*& producers() noexcept { return tls().producers; }
 
-#else // !TMC_WINDOWS_DLL
+#else // !TMC_SHARED_LIBRARY
 
 inline tmc::ex_any*& executor() noexcept {
   static constinit thread_local tmc::ex_any* val = nullptr;
@@ -105,7 +105,7 @@ inline void*& producers() noexcept {
   return val;
 }
 
-#endif // TMC_WINDOWS_DLL
+#endif // TMC_SHARED_LIBRARY
 
 // Used by awaiters. If the awaitable has already completed, this should be
 // checked to determine whether we are on the correct executor to resume inline.

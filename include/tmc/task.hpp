@@ -6,6 +6,7 @@
 #pragma once
 
 #include "tmc/detail/awaitable_customizer.hpp"
+#include "tmc/detail/allocation.hpp"
 #include "tmc/detail/compat.hpp"
 #include "tmc/detail/concepts_awaitable.hpp" // IWYU pragma: keep
 #include "tmc/detail/task_wrapper.hpp"       // IWYU pragma: keep
@@ -337,7 +338,7 @@ template <typename Result> struct task_promise {
     // std::printf("task_promise new %zu -> %zu\n", n, (n + TMC_CACHE_LINE_SIZE
     // - 1) & static_cast<size_t>(0-TMC_CACHE_LINE_SIZE));
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator new(n);
+    return tmc::detail::allocate(n);
   }
 
   // Aligned new/delete is necessary to support -fcoro-aligned-allocation
@@ -349,17 +350,19 @@ template <typename Result> struct task_promise {
     // std::printf("task_promise new %zu -> %zu\n", n, (n + TMC_CACHE_LINE_SIZE
     // - 1) & static_cast<size_t>(0-TMC_CACHE_LINE_SIZE));
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator new(n, al);
+    return tmc::detail::allocate_aligned(n, static_cast<std::size_t>(al));
   }
 
 #if TMC_SIZED_DEALLOCATION
   static void operator delete(void* ptr, std::size_t n) noexcept {
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator delete(ptr, n);
+    return tmc::detail::deallocate(ptr, n);
   }
   static void operator delete(void* ptr, std::size_t n, std::align_val_t al) noexcept {
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator delete(ptr, n, al);
+    return tmc::detail::deallocate_aligned(
+      ptr, n, static_cast<std::size_t>(al)
+    );
   }
 #endif
 
@@ -430,7 +433,7 @@ template <> struct task_promise<void> {
     // std::printf("task_promise new %zu -> %zu\n", n, (n + TMC_CACHE_LINE_SIZE
     // - 1) & static_cast<size_t>(0-TMC_CACHE_LINE_SIZE));
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator new(n);
+    return tmc::detail::allocate(n);
   }
 
   // Aligned new/delete is necessary to support -fcoro-aligned-allocation
@@ -442,17 +445,19 @@ template <> struct task_promise<void> {
     // std::printf("task_promise new %zu -> %zu\n", n, (n + TMC_CACHE_LINE_SIZE
     // - 1) & static_cast<size_t>(0-TMC_CACHE_LINE_SIZE));
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator new(n, al);
+    return tmc::detail::allocate_aligned(n, static_cast<std::size_t>(al));
   }
 
 #if TMC_SIZED_DEALLOCATION
   static void operator delete(void* ptr, std::size_t n) noexcept {
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator delete(ptr, n);
+    return tmc::detail::deallocate(ptr, n);
   }
   static void operator delete(void* ptr, std::size_t n, std::align_val_t al) noexcept {
     n = (n + TMC_CACHE_LINE_SIZE - 1) & static_cast<size_t>(0 - TMC_CACHE_LINE_SIZE);
-    return ::operator delete(ptr, n, al);
+    return tmc::detail::deallocate_aligned(
+      ptr, n, static_cast<std::size_t>(al)
+    );
   }
 #endif
 

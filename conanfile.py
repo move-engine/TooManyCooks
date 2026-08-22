@@ -39,8 +39,9 @@ class ToomanycooksConan(ConanFile):
         "debug_task_alloc_count": [True, False],
         "debug_thread_creation": [True, False],
 
-        # Build Modes - by default (both False), the library is header-only
+        # Build Modes - by default, the library is header-only
         "standalone_compilation": [True, False],
+        "shared_library": [True, False],
         "windows_dll": [True, False],
     }
     default_options = {
@@ -54,6 +55,7 @@ class ToomanycooksConan(ConanFile):
         "debug_task_alloc_count": False,
         "debug_thread_creation": False,
         "standalone_compilation": False,
+        "shared_library": False,
         "windows_dll": False,
     }
     options_description = {
@@ -67,6 +69,7 @@ class ToomanycooksConan(ConanFile):
         "debug_task_alloc_count": "https://www.fleetcode.com/oss/tmc/docs/dev/build_flags.html#tmc-debug-task-alloc-count",
         "debug_thread_creation": "https://www.fleetcode.com/oss/tmc/docs/dev/build_flags.html#tmc-debug-thread-creation",
         "standalone_compilation": "https://www.fleetcode.com/oss/tmc/docs/dev/build_flags.html#build-modes",
+        "shared_library": "https://www.fleetcode.com/oss/tmc/docs/dev/build_flags.html#build-modes",
         "windows_dll": "https://www.fleetcode.com/oss/tmc/docs/dev/build_flags.html#build-modes",
     }
 
@@ -96,8 +99,6 @@ class ToomanycooksConan(ConanFile):
             self.requires(f"boost/[>=1.84]", transitive_headers=True)
 
     def validate(self):
-        if self.options.get_safe("windows_dll", False) and not self.options.standalone_compilation:
-            raise ConanInvalidConfiguration("windows_dll requires standalone_compilation=True")
         if self.settings.compiler == "msvc":
             raise ConanInvalidConfiguration(
                 "TooManyCooks is currently unsupported with MSVC due to a compiler bug: "
@@ -150,7 +151,9 @@ class ToomanycooksConan(ConanFile):
             self.cpp_info.defines.append("TMC_DEBUG_TASK_ALLOC_COUNT")
         if self.options.debug_thread_creation:
             self.cpp_info.defines.append("TMC_DEBUG_THREAD_CREATION")
-        if self.options.standalone_compilation and not self.options.get_safe("windows_dll", False):
+        if self.options.shared_library:
+            self.cpp_info.defines.append("TMC_SHARED_LIBRARY")
+        elif self.options.standalone_compilation and not self.options.get_safe("windows_dll", False):
             self.cpp_info.defines.append("TMC_STANDALONE_COMPILATION")
         if self.options.get_safe("windows_dll", False):
             self.cpp_info.defines.append("TMC_WINDOWS_DLL")

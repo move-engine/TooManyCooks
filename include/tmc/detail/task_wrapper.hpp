@@ -9,6 +9,7 @@
 // awaitables from lassoing TMC tasks onto their executor.
 
 #include "tmc/detail/awaitable_customizer.hpp"
+#include "tmc/detail/allocation.hpp"
 #include "tmc/detail/compat.hpp"
 #include "tmc/detail/concepts_awaitable.hpp"
 #include "tmc/detail/impl.hpp" // IWYU pragma: keep
@@ -25,7 +26,7 @@
 namespace tmc {
 namespace detail {
 #ifdef TMC_DEBUG_TASK_ALLOC_COUNT
-#ifdef TMC_WINDOWS_DLL
+#ifdef TMC_SHARED_LIBRARY
 TMC_DECL extern std::atomic<size_t> g_task_alloc_count;
 #ifdef TMC_IMPL
 TMC_DECL constinit std::atomic<size_t> g_task_alloc_count = 0;
@@ -133,17 +134,30 @@ template <typename Result> struct task_wrapper_promise {
 
 #ifdef TMC_DEBUG_TASK_ALLOC_COUNT
   // Count frame allocations so that tests can detect whether HALO occurred.
+#endif
   static void* operator new(std::size_t n) {
+#ifdef TMC_DEBUG_TASK_ALLOC_COUNT
     ++tmc::detail::g_task_alloc_count;
-    return ::operator new(n);
+#endif
+    return tmc::detail::allocate(n);
   }
 
   // Aligned new is necessary to support -fcoro-aligned-allocation
   static void* operator new(std::size_t n, std::align_val_t al) {
+#ifdef TMC_DEBUG_TASK_ALLOC_COUNT
     ++tmc::detail::g_task_alloc_count;
-    return ::operator new(n, al);
-  }
 #endif
+    return tmc::detail::allocate_aligned(n, static_cast<std::size_t>(al));
+  }
+
+  static void operator delete(void* ptr, std::size_t n) noexcept {
+    tmc::detail::deallocate(ptr, n);
+  }
+
+  static void
+  operator delete(void* ptr, std::size_t n, std::align_val_t al) noexcept {
+    tmc::detail::deallocate_aligned(ptr, n, static_cast<std::size_t>(al));
+  }
 };
 
 template <> struct task_wrapper_promise<void> {
@@ -177,17 +191,30 @@ template <> struct task_wrapper_promise<void> {
 
 #ifdef TMC_DEBUG_TASK_ALLOC_COUNT
   // Count frame allocations so that tests can detect whether HALO occurred.
+#endif
   static void* operator new(std::size_t n) {
+#ifdef TMC_DEBUG_TASK_ALLOC_COUNT
     ++tmc::detail::g_task_alloc_count;
-    return ::operator new(n);
+#endif
+    return tmc::detail::allocate(n);
   }
 
   // Aligned new is necessary to support -fcoro-aligned-allocation
   static void* operator new(std::size_t n, std::align_val_t al) {
+#ifdef TMC_DEBUG_TASK_ALLOC_COUNT
     ++tmc::detail::g_task_alloc_count;
-    return ::operator new(n, al);
-  }
 #endif
+    return tmc::detail::allocate_aligned(n, static_cast<std::size_t>(al));
+  }
+
+  static void operator delete(void* ptr, std::size_t n) noexcept {
+    tmc::detail::deallocate(ptr, n);
+  }
+
+  static void
+  operator delete(void* ptr, std::size_t n, std::align_val_t al) noexcept {
+    tmc::detail::deallocate_aligned(ptr, n, static_cast<std::size_t>(al));
+  }
 };
 
 template <typename Result>

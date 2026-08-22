@@ -21,13 +21,14 @@ option(TMC_DEBUG_THREAD_CREATION "Print thread creation and work stealing info" 
 
 # ---- Build Mode Options ----
 option(TMC_STANDALONE_COMPILATION "Disable header-only mode. Library will be built into the file that defines TMC_IMPL" OFF)
+option(TMC_SHARED_LIBRARY "Keep process-wide globals and TLS in the TMC implementation shared library" OFF)
 
 if(WIN32)
-    option(TMC_WINDOWS_DLL "Enable Windows DLL mode" OFF)
+    option(TMC_WINDOWS_DLL "Deprecated alias for TMC_SHARED_LIBRARY" OFF)
 endif()
 
-if(TMC_WINDOWS_DLL AND NOT TMC_STANDALONE_COMPILATION)
-    message(FATAL_ERROR "TMC_WINDOWS_DLL requires TMC_STANDALONE_COMPILATION=ON")
+if(TMC_WINDOWS_DLL)
+    set(TMC_SHARED_LIBRARY ON)
 endif()
 
 # ---- INTERFACE library target ----
