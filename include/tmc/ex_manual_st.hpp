@@ -28,6 +28,14 @@ namespace tmc {
 /// It is safe to post work from any number of threads concurrently, but
 /// `run_*()` must only be called from 1 thread at a time.
 class ex_manual_st {
+public:
+  /// A callback invoked after work is published to this executor.
+  ///
+  /// The callback may be invoked concurrently from any producer thread. It
+  /// must not throw and should do no more than signal an external event loop.
+  using post_notification_fn = void (*)(void*) noexcept;
+
+private:
   struct qu_cfg : tmc::qu_mpsc_unbounded_default_config {
     static inline constexpr size_t BlockSize = 16384;
     static inline constexpr size_t PackingLevel = 1;
@@ -36,6 +44,8 @@ class ex_manual_st {
 
   struct InitParams {
     size_t priority_count = 0;
+    post_notification_fn post_notification = nullptr;
+    void* post_notification_userdata = nullptr;
   };
   InitParams* init_params; // accessed only during init()
 
@@ -66,6 +76,8 @@ class ex_manual_st {
 #else
   size_t PRIORITY_COUNT;
 #endif
+  post_notification_fn POST_NOTIFICATION;
+  void* POST_NOTIFICATION_USERDATA;
 
   TMC_DECL bool is_initialized();
 
@@ -122,6 +134,20 @@ public:
   /// The default is 1.
   TMC_DECL ex_manual_st& set_priority_count(size_t PriorityCount) TMC_LIFETIMEBOUND;
 #endif
+
+  /// Builder func to install a callback that is invoked after work is
+  /// published to the executor. This can be used to wake an externally owned
+  /// event loop before it calls one of the `run_*()` functions.
+  ///
+  /// The callback may run concurrently on any producer thread and must not
+  /// throw. It is invoked once for each single post and once for each nonempty
+  /// bulk post. Passing nullptr disables notification.
+  ///
+  /// This must be called before `init()`. The callback and userdata must remain
+  /// valid until `teardown()` returns.
+  TMC_DECL ex_manual_st& set_post_notification(
+    post_notification_fn Notification, void* Userdata = nullptr
+  ) noexcept TMC_LIFETIMEBOUND;
 
   /// Gets the number of priority levels. Only useful after `init()` has been
   /// called.

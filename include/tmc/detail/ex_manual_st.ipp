@@ -93,9 +93,13 @@ void ex_manual_st::notify_n(size_t Priority) {
       if (yield_priority.compare_exchange_strong(
             currentPrio, Priority, std::memory_order_acq_rel
           )) {
-        return;
+        break;
       }
     }
+  }
+
+  if (POST_NOTIFICATION != nullptr) {
+    POST_NOTIFICATION(POST_NOTIFICATION_USERDATA);
   }
 }
 
@@ -137,6 +141,8 @@ ex_manual_st::ex_manual_st()
       ,
       PRIORITY_COUNT{1}
 #endif
+      ,
+      POST_NOTIFICATION{nullptr}, POST_NOTIFICATION_USERDATA{nullptr}
 {
   initialized.store(false, std::memory_order_seq_cst);
 }
@@ -168,6 +174,14 @@ void ex_manual_st::init() {
   yield_priority = 0;
 
   if (init_params != nullptr) {
+    POST_NOTIFICATION = init_params->post_notification;
+    POST_NOTIFICATION_USERDATA = init_params->post_notification_userdata;
+  } else {
+    POST_NOTIFICATION = nullptr;
+    POST_NOTIFICATION_USERDATA = nullptr;
+  }
+
+  if (init_params != nullptr) {
     delete init_params;
     init_params = nullptr;
   }
@@ -188,6 +202,18 @@ ex_manual_st& ex_manual_st::set_priority_count(size_t PriorityCount) {
 }
 size_t ex_manual_st::priority_count() { return PRIORITY_COUNT; }
 #endif
+
+ex_manual_st& ex_manual_st::set_post_notification(
+  post_notification_fn Notification, void* Userdata
+) noexcept {
+  assert(!is_initialized());
+  if (init_params == nullptr) {
+    init_params = new InitParams;
+  }
+  init_params->post_notification = Notification;
+  init_params->post_notification_userdata = Userdata;
+  return *this;
+}
 
 void ex_manual_st::teardown() {
   bool expected = true;
