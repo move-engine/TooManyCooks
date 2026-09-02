@@ -174,14 +174,6 @@ void ex_manual_st::init() {
   yield_priority = 0;
 
   if (init_params != nullptr) {
-    POST_NOTIFICATION = init_params->post_notification;
-    POST_NOTIFICATION_USERDATA = init_params->post_notification_userdata;
-  } else {
-    POST_NOTIFICATION = nullptr;
-    POST_NOTIFICATION_USERDATA = nullptr;
-  }
-
-  if (init_params != nullptr) {
     delete init_params;
     init_params = nullptr;
   }
@@ -207,11 +199,8 @@ ex_manual_st& ex_manual_st::set_post_notification(
   post_notification_fn Notification, void* Userdata
 ) noexcept {
   assert(!is_initialized());
-  if (init_params == nullptr) {
-    init_params = new InitParams;
-  }
-  init_params->post_notification = Notification;
-  init_params->post_notification_userdata = Userdata;
+  POST_NOTIFICATION = Notification;
+  POST_NOTIFICATION_USERDATA = Userdata;
   return *this;
 }
 
@@ -227,6 +216,8 @@ void ex_manual_st::teardown() {
 
   work_queues.clear();
   private_work.clear();
+  POST_NOTIFICATION = nullptr;
+  POST_NOTIFICATION_USERDATA = nullptr;
 }
 
 ex_manual_st::~ex_manual_st() { teardown(); }

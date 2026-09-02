@@ -44,8 +44,6 @@ private:
 
   struct InitParams {
     size_t priority_count = 0;
-    post_notification_fn post_notification = nullptr;
-    void* post_notification_userdata = nullptr;
   };
   InitParams* init_params; // accessed only during init()
 
