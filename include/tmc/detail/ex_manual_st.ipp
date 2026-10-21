@@ -93,9 +93,13 @@ void ex_manual_st::notify_n(size_t Priority) {
       if (yield_priority.compare_exchange_strong(
             currentPrio, Priority, std::memory_order_acq_rel
           )) {
-        return;
+        break;
       }
     }
+  }
+
+  if (POST_NOTIFICATION != nullptr) {
+    POST_NOTIFICATION(POST_NOTIFICATION_USERDATA);
   }
 }
 
@@ -137,6 +141,8 @@ ex_manual_st::ex_manual_st()
       ,
       PRIORITY_COUNT{1}
 #endif
+      ,
+      POST_NOTIFICATION{nullptr}, POST_NOTIFICATION_USERDATA{nullptr}
 {
   initialized.store(false, std::memory_order_seq_cst);
 }
@@ -189,6 +195,15 @@ ex_manual_st& ex_manual_st::set_priority_count(size_t PriorityCount) {
 size_t ex_manual_st::priority_count() { return PRIORITY_COUNT; }
 #endif
 
+ex_manual_st& ex_manual_st::set_post_notification(
+  post_notification_fn Notification, void* Userdata
+) noexcept {
+  assert(!is_initialized());
+  POST_NOTIFICATION = Notification;
+  POST_NOTIFICATION_USERDATA = Userdata;
+  return *this;
+}
+
 void ex_manual_st::teardown() {
   bool expected = true;
   if (!initialized.compare_exchange_strong(expected, false)) {
@@ -201,6 +216,8 @@ void ex_manual_st::teardown() {
 
   work_queues.clear();
   private_work.clear();
+  POST_NOTIFICATION = nullptr;
+  POST_NOTIFICATION_USERDATA = nullptr;
 }
 
 ex_manual_st::~ex_manual_st() { teardown(); }

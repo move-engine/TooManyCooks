@@ -73,4 +73,9 @@ endif()
 # hide install target when used as a subproject
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     include(${CMAKE_CURRENT_LIST_DIR}/cmake/tmc-install.cmake)
+
+    include(CTest)
+    if(BUILD_TESTING)
+        add_subdirectory(tests)
+    endif()
 endif()

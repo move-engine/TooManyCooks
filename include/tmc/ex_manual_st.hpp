@@ -28,6 +28,14 @@ namespace tmc {
 /// It is safe to post work from any number of threads concurrently, but
 /// `run_*()` must only be called from 1 thread at a time.
 class ex_manual_st {
+public:
+  /// A callback invoked after work is published to this executor.
+  ///
+  /// The callback may be invoked concurrently from any producer thread. It
+  /// must not throw and should do no more than signal an external event loop.
+  using post_notification_fn = void (*)(void*) noexcept;
+
+private:
   struct qu_cfg : tmc::qu_mpsc_unbounded_default_config {
     static inline constexpr size_t BlockSize = 16384;
     static inline constexpr size_t PackingLevel = 1;
@@ -44,8 +52,7 @@ class ex_manual_st {
   using task_queue_t = tmc::qu_mpsc_unbounded<work_item, qu_cfg>;
   tmc::detail::tiny_vec<task_queue_t> work_queues; // size() == PRIORITY_COUNT
 
-  tmc::detail::tiny_vec<std::vector<work_item>>
-    private_work; // size() == PRIORITY_COUNT
+  tmc::detail::tiny_vec<std::vector<work_item>> private_work; // size() == PRIORITY_COUNT
 
   std::atomic<bool> initialized;
   std::atomic<size_t> yield_priority; // check to yield to a higher prio task
@@ -66,6 +73,8 @@ class ex_manual_st {
 #else
   size_t PRIORITY_COUNT;
 #endif
+  post_notification_fn POST_NOTIFICATION;
+  void* POST_NOTIFICATION_USERDATA;
 
   TMC_DECL bool is_initialized();
 
@@ -123,6 +132,26 @@ public:
   TMC_DECL ex_manual_st& set_priority_count(size_t PriorityCount) TMC_LIFETIMEBOUND;
 #endif
 
+  /// Builder func to install a callback that is invoked after work is
+  /// published to the executor. This can be used to wake an externally owned
+  /// event loop before it calls one of the `run_*()` functions.
+  ///
+  /// The callback may run concurrently on any producer thread and must not
+  /// throw. It is invoked once for each single post and once for each nonempty
+  /// bulk post. Passing nullptr disables notification.
+  ///
+  /// This must be called before `init()`. Lifecycle operations are externally
+  /// serialized: before calling `teardown()`, the caller must stop the consumer
+  /// and prevent producers from beginning another post. `teardown()` waits for
+  /// external posts that have already entered their guarded publication path,
+  /// including an in-flight notification callback, but it is not a concurrent
+  /// post-admission gate. The callback and userdata must remain valid until
+  /// `teardown()` returns. The callback must not call `teardown()` on this
+  /// executor.
+  TMC_DECL ex_manual_st& set_post_notification(
+    post_notification_fn Notification, void* Userdata = nullptr
+  ) noexcept TMC_LIFETIMEBOUND;
+
   /// Gets the number of priority levels. Only useful after `init()` has been
   /// called.
   TMC_DECL size_t priority_count();
@@ -142,6 +171,11 @@ public:
   /// calling `teardown()`, you may call `set_X()` to reconfigure the executor
   /// and call `init()` again.
   ///
+  /// The caller must first stop the consumer and externally prevent any
+  /// producer from beginning another post. An external post already inside its
+  /// guarded publication path is allowed to finish concurrently; teardown
+  /// waits for it. Unrestricted concurrent posting and teardown is unsupported.
+  ///
   /// If the executor is not initialized, calling `teardown()` will do nothing.
   TMC_DECL void teardown();
 
@@ -156,8 +190,7 @@ public:
   ///
   /// Rather than calling this directly, it is recommended to use the
   /// `tmc::post()` free function template.
-  TMC_DECL void
-  post(work_item&& Item, size_t Priority = 0, size_t ThreadHint = NO_HINT);
+  TMC_DECL void post(work_item&& Item, size_t Priority = 0, size_t ThreadHint = NO_HINT);
 
   /// Returns a pointer to the type erased `ex_any` version of this executor.
   /// This object shares a lifetime with this executor, and can be used for
@@ -172,12 +205,10 @@ public:
   /// Rather than calling this directly, it is recommended to use the
   /// `tmc::post_bulk()` free function template.
   template <typename It>
-  void post_bulk(
-    It&& Items, size_t Count, size_t Priority = 0, size_t ThreadHint = NO_HINT
-  ) {
+  void
+  post_bulk(It&& Items, size_t Count, size_t Priority = 0, size_t ThreadHint = NO_HINT) {
     clamp_priority(Priority);
-    bool fromExecThread =
-      tmc::detail::this_thread::executor() == &type_erased_this;
+    bool fromExecThread = tmc::detail::this_thread::executor() == &type_erased_this;
     if (Count > 0) [[likely]] {
       // A non-zero ThreadHint indicates that reschedule() was called. In that
       // case we should use the external queue to force FIFO ordering.
@@ -199,24 +230,20 @@ public:
 
 namespace detail {
 template <> struct executor_traits<tmc::ex_manual_st> {
-  static TMC_DECL void post(
-    tmc::ex_manual_st& ex, tmc::work_item&& Item, size_t Priority,
-    size_t ThreadHint
-  );
+  static TMC_DECL void
+  post(tmc::ex_manual_st& ex, tmc::work_item&& Item, size_t Priority, size_t ThreadHint);
 
   template <typename It>
   static inline void post_bulk(
-    tmc::ex_manual_st& ex, It&& Items, size_t Count, size_t Priority,
-    size_t ThreadHint
+    tmc::ex_manual_st& ex, It&& Items, size_t Count, size_t Priority, size_t ThreadHint
   ) {
     ex.post_bulk(static_cast<It&&>(Items), Count, Priority, ThreadHint);
   }
 
   static TMC_DECL tmc::ex_any* type_erased(tmc::ex_manual_st& ex TMC_LIFETIMEBOUND);
 
-  static TMC_DECL std::coroutine_handle<> dispatch(
-    tmc::ex_manual_st& ex, std::coroutine_handle<> Outer, size_t Priority
-  );
+  static TMC_DECL std::coroutine_handle<>
+  dispatch(tmc::ex_manual_st& ex, std::coroutine_handle<> Outer, size_t Priority);
 };
 } // namespace detail
 } // namespace tmc
